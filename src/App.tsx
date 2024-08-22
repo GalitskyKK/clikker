@@ -1,3 +1,4 @@
+// App.tsx
 import React, { useState, useEffect } from 'react';
 import './styles/main.scss';
 import fruit from './assets/fruit.png';
@@ -13,32 +14,72 @@ interface FloatingNumber {
 }
 
 const App: React.FC = () => {
+  const generateUserId = (): string => {
+    const userId = Date.now().toString();
+    localStorage.setItem('userId', userId);
+    return userId;
+  };
+
+  const [userId, setUserId] = useState<string>(localStorage.getItem('userId') || generateUserId());
   const [balance, setBalance] = useState<number>(0);
   const [energy, setEnergy] = useState<number>(100);
   const [floatingNumbers, setFloatingNumbers] = useState<FloatingNumber[]>([]);
 
   useEffect(() => {
-    // Загружаем начальные данные с сервера
-    getInitialData().then((data) => {
-      setBalance(data.balance);
-      setEnergy(data.energy);
-    });
+    const fetchData = async () => {
+      try {
+        const data = await getInitialData(userId);
+        setBalance(data.coins);
+        setEnergy(data.energy);
+      } catch (error) {
+        console.error('Failed to fetch initial data:', error);
+      }
+    };
 
-    // Устанавливаем WebSocket-соединение
-    const socket = createWebSocketConnection();
+    fetchData();
 
-    socket.onmessage = (event) => {
+    const coinsSocket = createWebSocketConnection(userId, 'coins');
+    const energySocket = createWebSocketConnection(userId, 'energy');
+
+    coinsSocket.onmessage = (event) => {
       const data = JSON.parse(event.data);
-      setBalance(data.balance);
-      setEnergy(data.energy);
+      if (data.coins) {
+        setBalance(parseFloat(data.coins));
+      }
+    };
+
+    energySocket.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.energy) {
+        setEnergy(parseFloat(data.energy));
+      }
     };
 
     return () => {
-      socket.close();
+      coinsSocket.close();
+      energySocket.close();
     };
-  }, []);
+  }, [userId]);
 
-  const handleFruitClick = async (e: React.MouseEvent<HTMLDivElement>) => {
+  useEffect(() => {
+    const handleBeforeUnload = async (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      try {
+        await updateBalanceAndEnergy(userId, balance, energy);
+      } catch (error) {
+        console.error('Failed to update balance and energy:', error);
+      }
+      return '';
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [balance, energy, userId]);
+
+  const handleFruitClick = async (e: React.MouseEvent<HTMLImageElement>) => {
     if (energy > 0) {
       const newBalance = balance + 1;
       const newEnergy = energy - 1;
@@ -46,33 +87,37 @@ const App: React.FC = () => {
       setBalance(newBalance);
       setEnergy(newEnergy);
 
-      // Обновляем данные на сервере
-      await updateBalanceAndEnergy(newBalance, newEnergy);
+      try {
+        await updateBalanceAndEnergy(userId, newBalance, newEnergy);
+      } catch (error) {
+        console.error('Failed to update balance and energy:', error);
+      }
 
-      const x = e.clientX - e.currentTarget.getBoundingClientRect().left;
-      const y = e.clientY - e.currentTarget.getBoundingClientRect().top;
+      const rect = e.currentTarget.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
 
       const newNumber: FloatingNumber = {
         id: Date.now(),
-        value: 1, // +1 за клик
+        value: 1,
         x,
         y,
       };
 
-      setFloatingNumbers([...floatingNumbers, newNumber]);
+      setFloatingNumbers((prevNumbers) => [...prevNumbers, newNumber]);
 
       setTimeout(() => {
         setFloatingNumbers((prevNumbers) =>
           prevNumbers.filter((number) => number.id !== newNumber.id),
         );
-      }, 1500); // Убираем через 1.5 секунды
+      }, 1500);
     }
   };
 
   useEffect(() => {
     const energyRegenInterval = setInterval(() => {
       setEnergy((prevEnergy) => Math.min(prevEnergy + 1, 100));
-    }, 1000); // Восстанавливаем энергию каждую секунду
+    }, 1000);
 
     return () => clearInterval(energyRegenInterval);
   }, []);
@@ -95,7 +140,7 @@ const App: React.FC = () => {
         <img className="fruit" src={fruit} onClick={handleFruitClick} alt="Berry" />
       </div>
       <div className="energy">
-        <div className="energy-bar" style={{ width: `${energy}%` }}>
+        <div className="energy-bar" style={{ width: `${Math.min(energy / 10, 100)}%` }}>
           {energy}
         </div>
       </div>

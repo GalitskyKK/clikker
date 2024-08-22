@@ -1,34 +1,29 @@
+// services/socket.ts
 const SOCKET_URL = 'ws://127.0.0.1:8002/ws';
 
-const generateUserId = () => {
-  return Math.floor(100000 + Math.random() * 900000).toString();
-};
-
-const getUserId = () => {
-  let userId = localStorage.getItem('userId');
-  if (!userId) {
-    userId = generateUserId();
-    localStorage.setItem('userId', userId);
-  }
-  return userId;
-};
-
-const userId = getUserId();
-
-export const createWebSocketConnection = () => {
-  const socket = new WebSocket(`${SOCKET_URL}?userId=${userId}`);
+export const createWebSocketConnection = (userId: string, type: 'coins' | 'energy') => {
+  const socket = new WebSocket(`${SOCKET_URL}/${type}_gain/${userId}`);
 
   socket.onopen = () => {
-    console.log('WebSocket connected');
+    console.log('WebSocket connected:', type);
   };
 
   socket.onmessage = (event) => {
-    const data = JSON.parse(event.data);
-    console.log('WebSocket data:', data);
+    try {
+      const data = JSON.parse(event.data);
+      console.log('WebSocket data:', data);
+      // Обработка данных о коинс или энергии
+    } catch (error) {
+      console.error('Error parsing WebSocket data:', error);
+    }
   };
 
   socket.onclose = () => {
-    console.log('WebSocket disconnected');
+    console.log('WebSocket disconnected:', type);
+  };
+
+  socket.onerror = (error) => {
+    console.error('WebSocket error:', error);
   };
 
   return socket;
