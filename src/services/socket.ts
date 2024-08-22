@@ -1,29 +1,24 @@
-// services/socket.ts
-const SOCKET_URL = 'ws://127.0.0.1:8002/ws';
+// socket.ts
 
-export const createWebSocketConnection = (userId: string, type: 'coins' | 'energy') => {
-  const socket = new WebSocket(`${SOCKET_URL}/${type}_gain/${userId}`);
+export const createWebSocketConnection = (userId: string, type: string): WebSocket => {
+  const url = `ws://127.0.0.1:8002/ws/${type}/${userId}`;
+  const socket = new WebSocket(url);
 
   socket.onopen = () => {
-    console.log('WebSocket connected:', type);
+    console.log(`WebSocket connection established: ${url}`);
   };
 
   socket.onmessage = (event) => {
-    try {
-      const data = JSON.parse(event.data);
-      console.log('WebSocket data:', data);
-      // Обработка данных о коинс или энергии
-    } catch (error) {
-      console.error('Error parsing WebSocket data:', error);
-    }
-  };
-
-  socket.onclose = () => {
-    console.log('WebSocket disconnected:', type);
+    console.log(`Message received: ${event.data}`);
+    // Обработка сообщения
   };
 
   socket.onerror = (error) => {
-    console.error('WebSocket error:', error);
+    console.error(`WebSocket error:`, error);
+  };
+
+  socket.onclose = (event) => {
+    console.log(`WebSocket connection closed: ${event.reason}`);
   };
 
   return socket;

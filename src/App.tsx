@@ -1,10 +1,8 @@
-// App.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { fetchUserData, postUserData } from './services/api';
 import './styles/main.scss';
 import fruit from './assets/fruit.png';
 import coin from './assets/coin.png';
-import { getInitialData, updateBalanceAndEnergy } from './services/api';
-import { createWebSocketConnection } from './services/socket';
 
 interface FloatingNumber {
   id: number;
@@ -14,72 +12,38 @@ interface FloatingNumber {
 }
 
 const App: React.FC = () => {
-  const generateUserId = (): string => {
-    const userId = Date.now().toString();
-    localStorage.setItem('userId', userId);
-    return userId;
-  };
-
-  const [userId, setUserId] = useState<string>(localStorage.getItem('userId') || generateUserId());
   const [balance, setBalance] = useState<number>(0);
   const [energy, setEnergy] = useState<number>(100);
   const [floatingNumbers, setFloatingNumbers] = useState<FloatingNumber[]>([]);
+  const [userId] = useState<number>(Math.floor(Math.random() * 10000)); // Генерация userId
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const data = await getInitialData(userId);
-        setBalance(data.coins);
-        setEnergy(data.energy);
-      } catch (error) {
-        console.error('Failed to fetch initial data:', error);
-      }
-    };
+  const initializeUserData = useCallback(async () => {
+    try {
+      const { coins, energy } = await fetchUserData(userId);
+      setBalance(coins);
+      setEnergy(energy);
+    } catch (error) {
+      console.error('Failed to fetch user data:', error);
+    }
+  }, [userId]);
 
-    fetchData();
-
-    const coinsSocket = createWebSocketConnection(userId, 'coins');
-    const energySocket = createWebSocketConnection(userId, 'energy');
-
-    coinsSocket.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      if (data.coins) {
-        setBalance(parseFloat(data.coins));
-      }
-    };
-
-    energySocket.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      if (data.energy) {
-        setEnergy(parseFloat(data.energy));
-      }
-    };
-
-    return () => {
-      coinsSocket.close();
-      energySocket.close();
-    };
+  const saveUserData = useCallback(async () => {
+    try {
+      await postUserData(userId, balance, energy);
+    } catch (error) {
+      console.error('Failed to post user data:', error);
+    }
   }, [userId]);
 
   useEffect(() => {
-    const handleBeforeUnload = async (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-      try {
-        await updateBalanceAndEnergy(userId, balance, energy);
-      } catch (error) {
-        console.error('Failed to update balance and energy:', error);
-      }
-      return '';
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
+    initializeUserData();
 
     return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
+      saveUserData();
     };
-  }, [balance, energy, userId]);
+  }, [initializeUserData, saveUserData]);
 
-  const handleFruitClick = async (e: React.MouseEvent<HTMLImageElement>) => {
+  const handleFruitClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (energy > 0) {
       const newBalance = balance + 1;
       const newEnergy = energy - 1;
@@ -87,15 +51,8 @@ const App: React.FC = () => {
       setBalance(newBalance);
       setEnergy(newEnergy);
 
-      try {
-        await updateBalanceAndEnergy(userId, newBalance, newEnergy);
-      } catch (error) {
-        console.error('Failed to update balance and energy:', error);
-      }
-
-      const rect = e.currentTarget.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
+      const x = e.clientX - e.currentTarget.getBoundingClientRect().left;
+      const y = e.clientY - e.currentTarget.getBoundingClientRect().top;
 
       const newNumber: FloatingNumber = {
         id: Date.now(),
@@ -104,7 +61,7 @@ const App: React.FC = () => {
         y,
       };
 
-      setFloatingNumbers((prevNumbers) => [...prevNumbers, newNumber]);
+      setFloatingNumbers([...floatingNumbers, newNumber]);
 
       setTimeout(() => {
         setFloatingNumbers((prevNumbers) =>
@@ -116,7 +73,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const energyRegenInterval = setInterval(() => {
-      setEnergy((prevEnergy) => Math.min(prevEnergy + 1, 100));
+      setEnergy((prevEnergy) => Math.min(prevEnergy + 1, 1000));
     }, 1000);
 
     return () => clearInterval(energyRegenInterval);
@@ -125,7 +82,7 @@ const App: React.FC = () => {
   return (
     <div className="app-container">
       <div className="balance">
-        <img className="coin" src={coin} alt="Coin" />
+        <img className="coin" src={coin} />
         {balance.toLocaleString()}
       </div>
       <div className="fruit-container">
@@ -140,7 +97,7 @@ const App: React.FC = () => {
         <img className="fruit" src={fruit} onClick={handleFruitClick} alt="Berry" />
       </div>
       <div className="energy">
-        <div className="energy-bar" style={{ width: `${Math.min(energy / 10, 100)}%` }}>
+        <div className="energy-bar" style={{ width: `${energy / 10}%` }}>
           {energy}
         </div>
       </div>
