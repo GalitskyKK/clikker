@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 
 const BASE_URL = 'http://127.0.0.1:8002/test';
 
@@ -32,7 +32,13 @@ export const postUserData = async (userId: number, coins: number, energy: number
     );
     return response.data;
   } catch (error) {
-    console.error('Error posting user data:', error.response?.data || error.message);
+    if (error instanceof AxiosError) {
+      console.error('Error posting user data:', error.response?.data || error.message);
+    } else if (error instanceof Error) {
+      console.error('Error posting user data:', error.message);
+    } else {
+      console.error('Unknown error posting user data:', error);
+    }
     throw error;
   }
 };

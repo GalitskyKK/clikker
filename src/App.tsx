@@ -40,7 +40,11 @@ const App: React.FC = () => {
       console.log('Sending POST request with:', { userId, balance, energy });
       await postUserData(userId, balance, energy);
     } catch (error) {
-      console.error('Failed to post user data:', error.response?.data || error.message);
+      if (error instanceof Error) {
+        console.error('Failed to post user data:', error.message);
+      } else {
+        console.error('Failed to post user data:', error);
+      }
     }
   }, [userId, balance, energy]);
 
