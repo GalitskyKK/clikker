@@ -29,11 +29,7 @@ const App: React.FC = () => {
       setBalance(coins);
       setEnergy(energy);
     } catch (error) {
-      if (error instanceof Error) {
-        console.error('Failed to fetch user data:', error.message);
-      } else {
-        console.error('Unexpected error:', error);
-      }
+      console.error('Failed to fetch user data:', error);
     }
   }, [userId]);
 
@@ -44,11 +40,7 @@ const App: React.FC = () => {
       console.log('Sending POST request with:', { userId, balance, energy });
       await postUserData(userId, balance, energy);
     } catch (error) {
-      if (error instanceof Error) {
-        console.error('Failed to post user data:', error.message);
-      } else {
-        console.error('Unexpected error:', error);
-      }
+      console.error('Failed to post user data:', error.response?.data || error.message);
     }
   }, [userId, balance, energy]);
 
@@ -56,18 +48,21 @@ const App: React.FC = () => {
     localStorage.setItem('userId', userId.toString());
     initializeUserData();
 
+    // Устанавливаем флаг монтирования компонента
     isMounted.current = true;
 
+    // Очистка при размонтировании компонента
     return () => {
       isMounted.current = false;
     };
   }, [initializeUserData, userId]);
 
   useEffect(() => {
+    // Обработка события beforeunload для отправки данных при закрытии страницы
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-      saveUserData();
-      return '';
+      event.preventDefault(); // Стандартный метод отмены действия
+      saveUserData(); // Вызываем функцию сохранения данных
+      return ''; // Возвращаем пустую строку для совместимости с браузерами
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
