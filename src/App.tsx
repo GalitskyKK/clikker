@@ -15,7 +15,6 @@ const App: React.FC = () => {
   const [balance, setBalance] = useState<number>(0);
   const [energy, setEnergy] = useState<number>(1000);
   const [floatingNumbers, setFloatingNumbers] = useState<FloatingNumber[]>([]);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [userId, setUserId] = useState<number>(() => {
     const storedUserId = localStorage.getItem('userId');
     return storedUserId ? parseInt(storedUserId, 10) : Math.floor(Math.random() * 10000);
@@ -26,6 +25,7 @@ const App: React.FC = () => {
   const initializeUserData = useCallback(async () => {
     try {
       const { coins, energy } = await fetchUserData(userId);
+      setUserId(userId);
       setBalance(coins);
       setEnergy(energy);
     } catch (error) {
