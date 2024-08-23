@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { fetchUserData, postUserData } from './services/api';
 import './styles/main.scss';
 import fruit from './assets/fruit.png';
@@ -13,9 +13,14 @@ interface FloatingNumber {
 
 const App: React.FC = () => {
   const [balance, setBalance] = useState<number>(0);
-  const [energy, setEnergy] = useState<number>(100);
+  const [energy, setEnergy] = useState<number>(1000);
   const [floatingNumbers, setFloatingNumbers] = useState<FloatingNumber[]>([]);
-  const [userId] = useState<number>(Math.floor(Math.random() * 10000)); // Генерация userId
+  const [userId, setUserId] = useState<number>(() => {
+    const storedUserId = localStorage.getItem('userId');
+    return storedUserId ? parseInt(storedUserId, 10) : Math.floor(Math.random() * 10000);
+  });
+
+  const isMounted = useRef<boolean>(false);
 
   const initializeUserData = useCallback(async () => {
     try {
@@ -28,22 +33,45 @@ const App: React.FC = () => {
   }, [userId]);
 
   const saveUserData = useCallback(async () => {
+    if (!isMounted.current) return;
+
     try {
+      console.log('Sending POST request with:', { userId, balance, energy });
       await postUserData(userId, balance, energy);
     } catch (error) {
-      console.error('Failed to post user data:', error);
+      console.error('Failed to post user data:', error.response?.data || error.message);
     }
-  }, [userId]);
+  }, [userId, balance, energy]);
 
   useEffect(() => {
+    localStorage.setItem('userId', userId.toString());
     initializeUserData();
 
-    return () => {
-      saveUserData();
-    };
-  }, [initializeUserData, saveUserData]);
+    // Устанавливаем флаг монтирования компонента
+    isMounted.current = true;
 
-  const handleFruitClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Очистка при размонтировании компонента
+    return () => {
+      isMounted.current = false;
+    };
+  }, [initializeUserData, userId]);
+
+  useEffect(() => {
+    // Обработка события beforeunload для отправки данных при закрытии страницы
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault(); // Стандартный метод отмены действия
+      saveUserData(); // Вызываем функцию сохранения данных
+      return ''; // Возвращаем пустую строку для совместимости с браузерами
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [saveUserData]);
+
+  const handleFruitClick = (e: React.MouseEvent<HTMLImageElement>) => {
     if (energy > 0) {
       const newBalance = balance + 1;
       const newEnergy = energy - 1;
@@ -51,8 +79,9 @@ const App: React.FC = () => {
       setBalance(newBalance);
       setEnergy(newEnergy);
 
-      const x = e.clientX - e.currentTarget.getBoundingClientRect().left;
-      const y = e.clientY - e.currentTarget.getBoundingClientRect().top;
+      const rect = e.currentTarget.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
 
       const newNumber: FloatingNumber = {
         id: Date.now(),
@@ -61,7 +90,7 @@ const App: React.FC = () => {
         y,
       };
 
-      setFloatingNumbers([...floatingNumbers, newNumber]);
+      setFloatingNumbers((prevNumbers) => [...prevNumbers, newNumber]);
 
       setTimeout(() => {
         setFloatingNumbers((prevNumbers) =>
@@ -79,10 +108,18 @@ const App: React.FC = () => {
     return () => clearInterval(energyRegenInterval);
   }, []);
 
+  useEffect(() => {
+    const autoFarmInterval = setInterval(() => {
+      setBalance((prevBalance) => prevBalance + 1);
+    }, 1000);
+
+    return () => clearInterval(autoFarmInterval);
+  }, []);
+
   return (
     <div className="app-container">
       <div className="balance">
-        <img className="coin" src={coin} />
+        <img className="coin" src={coin} alt="Coin" />
         {balance.toLocaleString()}
       </div>
       <div className="fruit-container">

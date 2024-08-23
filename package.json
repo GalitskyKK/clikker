@@ -15,7 +15,8 @@
     "axios": "^1.7.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "scss": "^0.2.4"
+    "scss": "^0.2.4",
+    "ws": "^8.18.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.0",
