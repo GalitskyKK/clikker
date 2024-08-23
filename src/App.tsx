@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { fetchUserData, postUserData } from './services/api';
+import { connectToWebSocket } from './services/socket';
 import './styles/main.scss';
 import fruit from './assets/fruit.png';
 import coin from './assets/coin.png';
@@ -55,9 +56,37 @@ const App: React.FC = () => {
     // Устанавливаем флаг монтирования компонента
     isMounted.current = true;
 
+    // Подключение к WebSocket
+    connectToWebSocket(userId, 'coins_gain', {
+      onMessage: (data) => {
+        console.log('Coins data:', data);
+        setBalance(data.coins); // Обновите баланс на основе данных из WebSocket
+      },
+      onError: (error) => {
+        console.error('Coins WebSocket error:', error);
+      },
+      onClose: (event) => {
+        console.log('Coins WebSocket closed:', event);
+      },
+    });
+
+    connectToWebSocket(userId, 'energy_gain', {
+      onMessage: (data) => {
+        console.log('Energy data:', data);
+        setEnergy(data.energy); // Обновите энергию на основе данных из WebSocket
+      },
+      onError: (error) => {
+        console.error('Energy WebSocket error:', error);
+      },
+      onClose: (event) => {
+        console.log('Energy WebSocket closed:', event);
+      },
+    });
+
     // Очистка при размонтировании компонента
     return () => {
       isMounted.current = false;
+      // Здесь можно добавить логику для закрытия WebSocket соединений, если нужно
     };
   }, [initializeUserData, userId]);
 
